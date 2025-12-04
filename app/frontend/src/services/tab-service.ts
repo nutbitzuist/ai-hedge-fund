@@ -1,10 +1,11 @@
 import { Settings } from '@/components/settings/settings';
 import { FlowTabContent } from '@/components/tabs/flow-tab-content';
+import { ChatInterface } from '@/components/chat/chat-interface';
 import { Flow } from '@/types/flow';
 import { ReactNode, createElement } from 'react';
 
 export interface TabData {
-  type: 'flow' | 'settings';
+  type: 'flow' | 'settings' | 'chat';
   title: string;
   flow?: Flow;
   metadata?: Record<string, any>;
@@ -21,6 +22,9 @@ export class TabService {
       
       case 'settings':
         return createElement(Settings);
+      
+      case 'chat':
+        return createElement(ChatInterface);
       
       default:
         throw new Error(`Unsupported tab type: ${tabData.type}`);
@@ -44,6 +48,14 @@ export class TabService {
     };
   }
 
+  static createChatTab(): TabData & { content: ReactNode } {
+    return {
+      type: 'chat',
+      title: 'Chat',
+      content: TabService.createTabContent({ type: 'chat', title: 'Chat' }),
+    };
+  }
+
   // Restore tab content for persisted tabs (used when loading from localStorage)
   static restoreTabContent(tabData: TabData): ReactNode {
     return TabService.createTabContent(tabData);
@@ -60,6 +72,9 @@ export class TabService {
       
       case 'settings':
         return TabService.createSettingsTab();
+      
+      case 'chat':
+        return TabService.createChatTab();
       
       default:
         throw new Error(`Cannot restore unsupported tab type: ${savedTab.type}`);

@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: ai-hedge-fund-backend
+    env: docker
+    dockerfilePath: ./Dockerfile.backend
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-hedge-fund-db
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: FINANCIAL_DATASETS_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: DEEPSEEK_API_KEY
+        sync: false
+
+  - type: web
+    name: ai-hedge-fund-frontend
+    env: docker
+    dockerfilePath: ./Dockerfile.frontend
+    dockerContext: .
+    plan: starter
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          name: ai-hedge-fund-backend
+          type: web
+          property: host
+
+databases:
+  - name: ai-hedge-fund-db
+    plan: starter
+    databaseName: ai_hedge_fund
+    user: ai_hedge_fund_user
+

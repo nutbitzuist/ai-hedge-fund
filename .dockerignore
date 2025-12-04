@@ -1,28 +1,29 @@
-# Git
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist
+build
+.env
+.venv
+venv/
+ENV/
+env/
+.pytest_cache
+.coverage
+htmlcov/
+*.log
 .git
 .gitignore
-
-# Poetry
-.venv
-__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-
-# Environment
-.env
-
-# IDEs and editors
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Logs and data
-logs/
-data/
-*.log
-
-# OS specific
-.DS_Store
-Thumbs.db 
+README.md
+node_modules/
+app/frontend/node_modules/
+app/frontend/dist/
+app/frontend/.vite/
+*.db
+*.sqlite
+*.sqlite3

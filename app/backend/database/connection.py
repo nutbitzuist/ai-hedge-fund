@@ -4,18 +4,24 @@ from sqlalchemy.orm import sessionmaker
 import os
 from pathlib import Path
 
-# Get the backend directory path
-BACKEND_DIR = Path(__file__).parent.parent
-DATABASE_PATH = BACKEND_DIR / "hedge_fund.db"
+# Use PostgreSQL if DATABASE_URL is set (production), otherwise SQLite (development)
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Database configuration - use absolute path
-DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
+if not DATABASE_URL:
+    # Fallback to SQLite for local development
+    BACKEND_DIR = Path(__file__).parent.parent
+    DATABASE_PATH = BACKEND_DIR / "hedge_fund.db"
+    DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
+    connect_args = {"check_same_thread": False}  # Needed for SQLite
+else:
+    # PostgreSQL connection (production)
+    # Replace postgres:// with postgresql:// for SQLAlchemy compatibility
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    connect_args = {}
 
 # Create SQLAlchemy engine
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False}  # Needed for SQLite
-)
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 
 # Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

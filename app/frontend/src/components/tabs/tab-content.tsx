@@ -1,8 +1,9 @@
 import { useTabsContext } from '@/contexts/tabs-context';
 import { cn } from '@/lib/utils';
 import { TabService } from '@/services/tab-service';
-import { FileText, FolderOpen } from 'lucide-react';
+import { FileText, FolderOpen, MessageSquare } from 'lucide-react';
 import { useEffect } from 'react';
+import { Button } from '@/components/ui/button';
 
 interface TabContentProps {
   className?: string;
@@ -39,19 +40,28 @@ export function TabContent({ className }: TabContentProps) {
     }
   }, [activeTab, openTab]);
 
+  const handleOpenChat = () => {
+    const chatTab = TabService.createChatTab();
+    openTab(chatTab);
+  };
+
   if (!activeTab) {
     return (
       <div className={cn(
         "h-full w-full flex items-center justify-center bg-background text-muted-foreground",
         className
       )}>
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-6">
           <FolderOpen size={48} className="mx-auto text-muted-foreground/50" />
           <div>
             <div className="text-xl font-medium mb-2">Welcome to the AI Hedge Fund</div>
-            <div className="text-sm max-w-md">
-              Create a flow from the left sidebar (⌘B) to open it in a tab, or open settings (⌘,) to configure your preferences.
+            <div className="text-sm max-w-md mb-4">
+              Get started by chatting with the AI hedge fund about stocks, or create a flow from the left sidebar (⌘B).
             </div>
+            <Button onClick={handleOpenChat} className="gap-2">
+              <MessageSquare size={16} />
+              Start Chatting
+            </Button>
           </div>
           <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/70">
             <FileText size={14} />
