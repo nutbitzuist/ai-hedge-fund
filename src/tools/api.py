@@ -19,6 +19,13 @@ from src.data.models import (
     CompanyFactsResponse,
 )
 
+# Try to import yfinance for Yahoo Finance fallback
+try:
+    import yfinance as yf
+    YFINANCE_AVAILABLE = True
+except ImportError:
+    YFINANCE_AVAILABLE = False
+
 # Global cache instance
 _cache = get_cache()
 
@@ -58,7 +65,7 @@ def _make_api_request(url: str, headers: dict, method: str = "GET", json_data: d
 
 
 def get_prices(ticker: str, start_date: str, end_date: str, api_key: str = None) -> list[Price]:
-    """Fetch price data from cache or API."""
+    """Fetch price data from cache or API (with Yahoo Finance fallback)."""
     # Create a cache key that includes all parameters to ensure exact matches
     cache_key = f"{ticker}_{start_date}_{end_date}"
     
@@ -69,24 +76,54 @@ def get_prices(ticker: str, start_date: str, end_date: str, api_key: str = None)
     # If not in cache, fetch from API
     headers = {}
     financial_api_key = api_key or os.environ.get("FINANCIAL_DATASETS_API_KEY")
+    
+    # Try Financial Datasets API first if key is available
     if financial_api_key:
         headers["X-API-KEY"] = financial_api_key
-
-    url = f"https://api.financialdatasets.ai/prices/?ticker={ticker}&interval=day&interval_multiplier=1&start_date={start_date}&end_date={end_date}"
-    response = _make_api_request(url, headers)
-    if response.status_code != 200:
-        raise Exception(f"Error fetching data: {ticker} - {response.status_code} - {response.text}")
-
-    # Parse response with Pydantic model
-    price_response = PriceResponse(**response.json())
-    prices = price_response.prices
-
-    if not prices:
-        return []
-
-    # Cache the results using the comprehensive cache key
-    _cache.set_prices(cache_key, [p.model_dump() for p in prices])
-    return prices
+        url = f"https://api.financialdatasets.ai/prices/?ticker={ticker}&interval=day&interval_multiplier=1&start_date={start_date}&end_date={end_date}"
+        response = _make_api_request(url, headers)
+        if response.status_code == 200:
+            # Parse response with Pydantic model
+            price_response = PriceResponse(**response.json())
+            prices = price_response.prices
+            if prices:
+                # Cache the results using the comprehensive cache key
+                _cache.set_prices(cache_key, [p.model_dump() for p in prices])
+                return prices
+    
+    # Fallback to Yahoo Finance if no API key or API failed
+    if YFINANCE_AVAILABLE:
+        try:
+            stock = yf.Ticker(ticker)
+            df = stock.history(start=start_date, end=end_date)
+            if df.empty:
+                return []
+            
+            # Convert to Price objects
+            prices = []
+            for date, row in df.iterrows():
+                price = Price(
+                    ticker=ticker,
+                    time=date.strftime("%Y-%m-%dT%H:%M:%S"),
+                    open=float(row['Open']),
+                    high=float(row['High']),
+                    low=float(row['Low']),
+                    close=float(row['Close']),
+                    volume=int(row['Volume'])
+                )
+                prices.append(price)
+            
+            # Cache the results
+            _cache.set_prices(cache_key, [p.model_dump() for p in prices])
+            return prices
+        except Exception as e:
+            print(f"Yahoo Finance fallback failed for {ticker}: {e}")
+    
+    # If both fail and no API key, raise error
+    if not financial_api_key:
+        raise Exception(f"No API key provided and Yahoo Finance unavailable. Please set FINANCIAL_DATASETS_API_KEY or install yfinance.")
+    
+    raise Exception(f"Error fetching data: {ticker} - {response.status_code} - {response.text}")
 
 
 def get_financial_metrics(
@@ -293,35 +330,38 @@ def get_market_cap(
     end_date: str,
     api_key: str = None,
 ) -> float | None:
-    """Fetch market cap from the API."""
-    # Check if end_date is today
-    if end_date == datetime.datetime.now().strftime("%Y-%m-%d"):
-        # Get the market cap from company facts API
-        headers = {}
-        financial_api_key = api_key or os.environ.get("FINANCIAL_DATASETS_API_KEY")
-        if financial_api_key:
-            headers["X-API-KEY"] = financial_api_key
+    """Fetch market cap from the API (with Yahoo Finance fallback)."""
+    financial_api_key = api_key or os.environ.get("FINANCIAL_DATASETS_API_KEY")
+    
+    # Try Financial Datasets API first if key is available
+    if financial_api_key:
+        # Check if end_date is today
+        if end_date == datetime.datetime.now().strftime("%Y-%m-%d"):
+            # Get the market cap from company facts API
+            headers = {"X-API-KEY": financial_api_key}
+            url = f"https://api.financialdatasets.ai/company/facts/?ticker={ticker}"
+            response = _make_api_request(url, headers)
+            if response.status_code == 200:
+                data = response.json()
+                response_model = CompanyFactsResponse(**data)
+                return response_model.company_facts.market_cap
 
-        url = f"https://api.financialdatasets.ai/company/facts/?ticker={ticker}"
-        response = _make_api_request(url, headers)
-        if response.status_code != 200:
-            print(f"Error fetching company facts: {ticker} - {response.status_code}")
-            return None
-
-        data = response.json()
-        response_model = CompanyFactsResponse(**data)
-        return response_model.company_facts.market_cap
-
-    financial_metrics = get_financial_metrics(ticker, end_date, api_key=api_key)
-    if not financial_metrics:
-        return None
-
-    market_cap = financial_metrics[0].market_cap
-
-    if not market_cap:
-        return None
-
-    return market_cap
+        financial_metrics = get_financial_metrics(ticker, end_date, api_key=api_key)
+        if financial_metrics and financial_metrics[0].market_cap:
+            return financial_metrics[0].market_cap
+    
+    # Fallback to Yahoo Finance
+    if YFINANCE_AVAILABLE:
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
+            market_cap = info.get('marketCap')
+            if market_cap:
+                return float(market_cap)
+        except Exception as e:
+            print(f"Yahoo Finance fallback failed for market cap {ticker}: {e}")
+    
+    return None
 
 
 def prices_to_df(prices: list[Price]) -> pd.DataFrame:
