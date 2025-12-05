@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { getActionColor } from './output-tab-utils';
+import { useState } from 'react';
 
 // Component for displaying backtest progress
 function BacktestProgress({ agentData }: { agentData: Record<string, any> }) {
@@ -36,6 +37,7 @@ function BacktestProgress({ agentData }: { agentData: Record<string, any> }) {
 // Component for displaying backtest trading table (similar to CLI)
 function BacktestTradingTable({ agentData }: { agentData: Record<string, any> }) {
   const backtestAgent = agentData['backtest'];
+  const [dateSortDirection, setDateSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // console.log("backtestAgent", backtestAgent);
   
@@ -86,11 +88,20 @@ function BacktestTradingTable({ agentData }: { agentData: Record<string, any> })
       performance_metrics: backtestResult.performance_metrics,
     });
   });
+  
+  // Toggle sort direction
+  const handleDateSort = () => {
+    setDateSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+  };
     
-  // Sort by date descending (newest first) and show only the last 50 rows to avoid performance issues
-  const recentRows = tableRows
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 50);
+  // Sort by date based on current sort direction and show only the last 50 rows to avoid performance issues
+  const sortedRows = [...tableRows].sort((a, b) => {
+    const dateA = new Date(a.date).getTime();
+    const dateB = new Date(b.date).getTime();
+    return dateSortDirection === 'asc' ? dateA - dateB : dateB - dateA;
+  });
+  
+  const recentRows = sortedRows.slice(0, 50);
   
   
   return (
@@ -103,7 +114,19 @@ function BacktestTradingTable({ agentData }: { agentData: Record<string, any> })
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
+                <TableHead>
+                  <button
+                    onClick={handleDateSort}
+                    className="flex items-center gap-1 hover:text-primary transition-colors"
+                  >
+                    Date
+                    {dateSortDirection === 'asc' ? (
+                      <ArrowUp className="h-3 w-3" />
+                    ) : (
+                      <ArrowDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
                 <TableHead>Ticker</TableHead>
                 <TableHead>Action</TableHead>
                 <TableHead>Quantity</TableHead>
